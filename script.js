@@ -33,7 +33,10 @@ window.addEventListener('urlChange-pip', async () => {
             }, 
             TRIAL, 
             SLEEP_MS
-        ).catch(e => {throw new Error(e)});
+        ).catch(e => {
+            console.error(e);
+            throw new Error(e);
+        });
     }
 
     // フォーラム
@@ -119,7 +122,9 @@ async function promiseLoop(func, trial, sleepMs) {
             await sleep(sleepMs);
             if(i === trial) {
                 return new Promise((_, reject) => {
-                    reject(new Error(`N-PiP：loop関数内でエラーが発生しました：${e.message}`));
+                    const errObj = new Error(`N-PiP：loop関数内でエラーが発生しました：${e.message}`);
+                    console.error(errObj);
+                    reject(errObj);
                 });
             }
         });
