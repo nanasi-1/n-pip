@@ -24,7 +24,7 @@ window.addEventListener('urlChange-pip', async () => {
     async function loop(func, trial, sleepMs) {
         await sleep(500);
         for (let i = 0; i < trial; i++) {
-            if (func) break;
+            if (func()) break;
             await sleep(sleepMs);
         }
     }
@@ -33,16 +33,44 @@ window.addEventListener('urlChange-pip', async () => {
     if ((new RegExp('/courses/.*/chapters/.*/.*/.*')).test(location.href)) {
         await sleep(500);
         const ifr = document.querySelector('[aria-label="教材モーダル"]>iframe');
-        await loop(appendBtn(() => {
-            pip(ifr);
-        }, ifr.contentDocument), TRIAL, SLEEP_MS);
+        await loop(
+            () => {
+                appendBtn(() => {
+                    pip(ifr);
+                }, ifr.contentDocument);
+            }, 
+            TRIAL, 
+            SLEEP_MS
+        );
     }
 
-    // TODO フォーラム用のやつを実装
+    // フォーラム
+    if ((new RegExp('/questions/.*')).test(location.href)) {
+        await sleep(500);
+        if(document.querySelectorAll('#root div>p').length !== 3) return;
+        const aElem = document.querySelector('div:has(>p) a');
+
+        aElem.addEventListener('click', async () => {
+            await sleep(500);
+            const ifr = document.querySelector('[title="引用教材"]');
+            console.log('click');
+            await loop(async () => {
+                console.log('loop');
+                const btn = await appendBtn(
+                    () => {pip(ifr);}, 
+                    ifr.contentDocument,
+                    false
+                )
+                if(!btn) return false;
+                ifr.contentDocument.querySelector('header').append(btn);
+                return true;
+            }, TRIAL, SLEEP_MS);
+        });
+    }
 });
 
 /** ボタンを追加する関数 @param {() => any} handle  */
-async function appendBtn(handle, doc) {
+async function appendBtn(handle, doc, isAppend=true) {
     const header = doc.querySelector('header');
     if(!header) return false;
     const isBookmark = !!header.querySelector('#bookmark-btn');
@@ -58,7 +86,7 @@ async function appendBtn(handle, doc) {
 
     btn.textContent = 'PiPで見る';
     btn.addEventListener('click', handle);
-    header.insertBefore(btn, header.querySelector('button'));
+    if(isAppend) header.insertBefore(btn, header.querySelector('button'));
 
     return btn;
 }
