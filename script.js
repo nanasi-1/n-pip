@@ -6,7 +6,7 @@ async function pip(elem) {
     if(documentPictureInPicture.window) return;
     const container = elem.parentElement; // 復帰用
     const pip = await documentPictureInPicture.requestWindow({
-        width: 500,
+        width: 800,
         height: 1200,
     });
     pip.document.body.append(elem);
@@ -18,18 +18,31 @@ async function pip(elem) {
 }
 
 window.addEventListener('urlChange-pip', async () => {
+    const TRIAL = 20; // ループ回数、多分このくらいでいいと思う
+    const SLEEP_MS = 50; // ループ間隔、多分こんくらいでいいと思う
 
-    await sleep(500);
-    for (let i = 0; i < 20; i++) {
-        if(appendBtn(pip)) break;
-        await sleep(50);
+    async function loop(func, trial, sleepMs) {
+        await sleep(500);
+        for (let i = 0; i < trial; i++) {
+            if (func) break;
+            await sleep(sleepMs);
+        }
     }
+
+    // 教材
+    if ((new RegExp('/courses/.*/chapters/.*/.*/.*')).test(location.href)) {
+        await sleep(500);
+        const ifr = document.querySelector('[aria-label="教材モーダル"]>iframe');
+        await loop(appendBtn(() => {
+            pip(ifr);
+        }, ifr.contentDocument), TRIAL, SLEEP_MS);
+    }
+
+    // TODO フォーラム用のやつを実装
 });
 
 /** ボタンを追加する関数 @param {() => any} handle  */
-async function appendBtn(handle) {
-    /** @type {Document} */
-    const doc = document.querySelector('[aria-label="教材モーダル"]>iframe').contentDocument;
+async function appendBtn(handle, doc) {
     const header = doc.querySelector('header');
     if(!header) return false;
     const isBookmark = !!header.querySelector('#bookmark-btn');
