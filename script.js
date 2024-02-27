@@ -48,9 +48,7 @@ window.addEventListener('urlChange-pip', async () => {
         aElem.addEventListener('click', async () => {
             await sleep(500);
             const ifr = document.querySelector('[title="引用教材"]');
-            console.log('click');
             await promiseLoop(async () => {
-                console.log('loop');
                 const btn = await appendBtn(
                     () => {pip(ifr);}, 
                     ifr.contentDocument,
