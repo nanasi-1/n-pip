@@ -21,27 +21,19 @@ window.addEventListener('urlChange-pip', async () => {
     const TRIAL = 20; // ループ回数、多分このくらいでいいと思う
     const SLEEP_MS = 50; // ループ間隔、多分こんくらいでいいと思う
 
-    async function loop(func, trial, sleepMs) {
-        await sleep(500);
-        for (let i = 0; i < trial; i++) {
-            if (func()) break;
-            await sleep(sleepMs);
-        }
-    }
-
     // 教材
     if ((new RegExp('/courses/.*/chapters/.*/.*/.*')).test(location.href)) {
         await sleep(500);
         const ifr = document.querySelector('[aria-label="教材モーダル"]>iframe');
-        await loop(
-            () => {
-                appendBtn(() => {
+        await promiseLoop(
+            async () => {
+                await appendBtn(() => {
                     pip(ifr);
                 }, ifr.contentDocument);
             }, 
             TRIAL, 
             SLEEP_MS
-        );
+        ).catch(e => {throw new Error(e)});
     }
 
     // フォーラム
@@ -54,7 +46,7 @@ window.addEventListener('urlChange-pip', async () => {
             await sleep(500);
             const ifr = document.querySelector('[title="引用教材"]');
             console.log('click');
-            await loop(async () => {
+            await promiseLoop(async () => {
                 console.log('loop');
                 const btn = await appendBtn(
                     () => {pip(ifr);}, 
@@ -69,10 +61,20 @@ window.addEventListener('urlChange-pip', async () => {
     }
 });
 
-/** ボタンを追加する関数 @param {() => any} handle  */
+/** 
+ * ボタンを追加する関数 
+ * @param {() => any} handle 
+ * @param {Document} doc   
+ * @param {() => void} reject 失敗時の処理（promiseのreject）
+ */
 async function appendBtn(handle, doc, isAppend=true) {
     const header = doc.querySelector('header');
-    if(!header) return false;
+    if(!header) {
+        return new Promise((_, reject) => {
+            reject(new Error('header要素が空です、読み込みが遅い可能性があります'));
+        })
+    };
+    if(header.querySelector('#pip-btn')) return true;
     const isBookmark = !!header.querySelector('#bookmark-btn');
 
     const btn = strToElement('<button id="pip-btn" class="u-button type-primary"></button>');
@@ -109,6 +111,20 @@ async function appendBtn(handle, doc, isAppend=true) {
         });
         window.dispatchEvent(new CustomEvent('urlChange-pip'));
     });
+}
+
+async function promiseLoop(func, trial, sleepMs) {
+    for (let i = 0; i < trial; i++) {
+        const result = await func().catch(async e => {
+            await sleep(sleepMs);
+            if(i === trial) {
+                return new Promise((_, reject) => {
+                    reject(new Error(`N-PiP：loop関数内でエラーが発生しました：${e.message}`));
+                });
+            }
+        });
+        return result;
+    }
 }
 
 function sleep(sec) {
