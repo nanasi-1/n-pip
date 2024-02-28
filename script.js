@@ -27,8 +27,8 @@ window.addEventListener('urlChange-pip', async () => {
         const ifr = document.querySelector('[aria-label="教材モーダル"]>iframe');
         await promiseLoop(
             async () => {
-                await appendBtn(() => {
-                    pip(ifr);
+                await appendBtn(async () => {
+                    await pip(ifr);
                 }, ifr.contentDocument);
             }, 
             TRIAL, 
@@ -50,7 +50,7 @@ window.addEventListener('urlChange-pip', async () => {
             const ifr = document.querySelector('[title="引用教材"]');
             await promiseLoop(async () => {
                 const btn = await appendBtn(
-                    () => {pip(ifr);}, 
+                    async () => {await pip(ifr);}, 
                     ifr.contentDocument,
                     false
                 )
@@ -64,7 +64,7 @@ window.addEventListener('urlChange-pip', async () => {
 
 /** 
  * ボタンを追加する関数 
- * @param {() => any} handle 
+ * @param {() => Promise<any>} handle 
  * @param {Document} doc   
  * @param {() => void} reject 失敗時の処理（promiseのreject）
  */
