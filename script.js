@@ -18,24 +18,22 @@ async function pip(elem) {
 }
 
 window.addEventListener('urlChange-pip', async () => {
-    const TRIAL = 20; // ループ回数、多分このくらいでいいと思う
-    const SLEEP_MS = 50; // ループ間隔、多分こんくらいでいいと思う
-
     // 教材
     if ((new RegExp('/courses/.*/chapters/.*/.*/.*')).test(location.href)) {
-        await sleep(500);
-        const ifr = document.querySelector('[aria-label="教材モーダル"]>iframe');
-        await promiseLoop(
-            async () => {
-                await appendBtn(async () => {
-                    await pip(ifr);
-                }, ifr.contentDocument);
-            }, 
-            TRIAL, 
-            SLEEP_MS
-        ).catch(e => {
-            console.error(e);
-            throw new Error(e);
+        await sleep(300);
+        const ifr = await promiseLoop(() => {
+            const result = document.querySelector('[aria-label="教材モーダル"]>iframe');
+            return result;
+        }, [null]);
+        if(!ifr || ifr?.contentDocument?.baseURI === location.href) {
+            console.info(`N-PiP: ifr要素が空または正常ではありませんでした。このログはPiPボタンをクリックしたときにも出ます。 ifr: ${ifr}`);
+            return;
+        };
+
+        await promiseLoop(async () => {
+            await appendBtn(async () => {
+                await pip(ifr);
+            }, ifr.contentDocument);
         });
     }
 
@@ -53,11 +51,11 @@ window.addEventListener('urlChange-pip', async () => {
                     async () => {await pip(ifr);}, 
                     ifr.contentDocument,
                     false
-                )
+                );
                 if(!btn) return false;
                 ifr.contentDocument.querySelector('header').append(btn);
                 return true;
-            }, TRIAL, SLEEP_MS);
+            });
         });
     }
 });
@@ -66,16 +64,14 @@ window.addEventListener('urlChange-pip', async () => {
  * ボタンを追加する関数 
  * @param {() => Promise<any>} handle 
  * @param {Document} doc   
- * @param {() => void} reject 失敗時の処理（promiseのreject）
  */
 async function appendBtn(handle, doc, isAppend=true) {
-    const header = doc.querySelector('header');
-    if(!header) {
-        return new Promise((_, reject) => {
-            reject(new Error('header要素が空です、読み込みが遅い可能性があります'));
-        })
+    const header = await promiseLoop(() => doc.querySelector('header'), [null]);
+    if(!header) throw new Error(`header要素が${header}でした。読み込みが遅い可能性があります`);
+    if(header.querySelector('#pip-btn')) {
+        console.debug('N-PiP: PiPボタンはすでにあります');
+        return;
     };
-    if(header.querySelector('#pip-btn')) return true;
     const isBookmark = !!header.querySelector('#bookmark-btn');
 
     const btn = strToElement('<button id="pip-btn" class="u-button type-primary"></button>');
@@ -90,7 +86,6 @@ async function appendBtn(handle, doc, isAppend=true) {
     btn.textContent = 'PiPで見る';
     btn.addEventListener('click', handle);
     if(isAppend) header.insertBefore(btn, header.querySelector('button'));
-
     return btn;
 }
 
@@ -114,19 +109,27 @@ async function appendBtn(handle, doc, isAppend=true) {
     });
 }
 
-async function promiseLoop(func, trial, sleepMs) {
-    for (let i = 0; i < trial; i++) {
-        const result = await func().catch(async e => {
-            await sleep(sleepMs);
-            if(i === trial) {
-                return new Promise((_, reject) => {
-                    const errObj = new Error(`N-PiP：loop関数内でエラーが発生しました：${e.message}`);
+async function promiseLoop(func, ngList=[], isThrow=false) {
+    const TRIAL = 20;
+    const SLEEP_MS = 50;
+    for (let i = 0; i < TRIAL; i++) {
+        try {
+            const result = await func();
+            if(ngList.includes(result)) throw new Error(`関数の実行結果が${result}でした`);
+            return result;
+        } catch (e) {
+            await sleep(SLEEP_MS);
+            if (i >= TRIAL - 1) { // ループじゃ解決しなかった場合
+                const errObj = new Error(`N-PiP：loop関数内でエラーが発生しました：${e.message} ${e.stack}`);
+                if (isThrow) {
                     console.error(errObj);
-                    reject(errObj);
-                });
+                    throw errObj;
+                } else {
+                    console.info(errObj);
+                    return;
+                }
             }
-        });
-        return result;
+        }
     }
 }
 
