@@ -77,7 +77,6 @@ window.addEventListener('urlChange-pip', async () => {
 async function appendBtn(handle, doc, isAppend=true) {
     const header = doc.querySelector('header');
     if(!header) {
-        console.log('スロー');
         throw new Error(`header要素が${header}でした。読み込みが遅い可能性があります`);
     };
     if(header.querySelector('#pip-btn')) {
