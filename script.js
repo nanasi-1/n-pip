@@ -40,7 +40,7 @@ window.addEventListener('urlChange-pip', async () => {
     // フォーラム
     if ((new RegExp('/questions/.*')).test(location.href)) {
         await sleep(200);
-        const pList = await promiseLoop(() => document.querySelector('#root div:not([role="banner"] *)>p'), [null]);
+        const pList = await promiseLoop(() => document.querySelector('#root div:not([role="banner"] *)>p'));
         if(!pList) return;
         const aElem = pList.parentElement.querySelector('a');
 
