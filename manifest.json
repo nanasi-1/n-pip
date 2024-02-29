@@ -2,7 +2,7 @@
     "manifest_version": 3,
     "name": "N-PiP",
     "description": "N予備校の教材をピクチャーインピクチャーで見る",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "content_scripts": [
         {"matches": ["https://www.nnn.ed.nico/*"], "js": ["script.js"]}
     ]
