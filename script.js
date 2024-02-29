@@ -39,23 +39,32 @@ window.addEventListener('urlChange-pip', async () => {
 
     // フォーラム
     if ((new RegExp('/questions/.*')).test(location.href)) {
-        await sleep(500);
-        if(document.querySelectorAll('#root div>p').length !== 3) return;
-        const aElem = document.querySelector('div:has(>p) a');
+        await sleep(200);
+        const pList = await promiseLoop(() => document.querySelector('#root div:not([role="banner"] *)>p'), [null]);
+        if(!pList) return;
+        const aElem = pList.parentElement.querySelector('a');
 
         aElem.addEventListener('click', async () => {
-            await sleep(500);
-            const ifr = document.querySelector('[title="引用教材"]');
-            await promiseLoop(async () => {
-                const btn = await appendBtn(
-                    async () => {await pip(ifr);}, 
-                    ifr.contentDocument,
-                    false
-                );
-                if(!btn) return false;
-                ifr.contentDocument.querySelector('header').append(btn);
-                return true;
-            });
+            await sleep(300);
+            const ifr = await promiseLoop(() => document.querySelector('[title="引用教材"]'));
+            if (!ifr || !ifr?.contentDocument) {
+                console.debug('N-PiP: 教材の要素が見つかりませんでした ifr:', ifr, ifr?.contentDocument);
+                return;
+            }
+
+            if (ifr.contentDocument.querySelector('#pip-btn')) {
+                console.debug('N-PiP: PiPボタンはすでにあります');
+                return;
+            }
+            const btn = await promiseLoop(async () => await appendBtn(
+                async () => await pip(ifr),
+                ifr.contentDocument,
+            ));
+            if (!btn) {
+                console.info(`何らかの理由でボタンが追加できませんでした：btnが${btn}でした`);
+                return;
+            }
+            await promiseLoop(() => ifr.contentDocument.querySelector('header').append(btn));
         });
     }
 });
@@ -66,8 +75,11 @@ window.addEventListener('urlChange-pip', async () => {
  * @param {Document} doc   
  */
 async function appendBtn(handle, doc, isAppend=true) {
-    const header = await promiseLoop(() => doc.querySelector('header'), [null]);
-    if(!header) throw new Error(`header要素が${header}でした。読み込みが遅い可能性があります`);
+    const header = doc.querySelector('header');
+    if(!header) {
+        console.log('スロー');
+        throw new Error(`header要素が${header}でした。読み込みが遅い可能性があります`);
+    };
     if(header.querySelector('#pip-btn')) {
         console.debug('N-PiP: PiPボタンはすでにあります');
         return;
@@ -120,7 +132,7 @@ async function promiseLoop(func, ngList=[], isThrow=false) {
         } catch (e) {
             await sleep(SLEEP_MS);
             if (i >= TRIAL - 1) { // ループじゃ解決しなかった場合
-                const errObj = new Error(`N-PiP：loop関数内でエラーが発生しました：${e.message} ${e.stack}`);
+                const errObj = new Error(`N-PiP：loopで解決しないエラーが発生しました：${e.message} ${e.stack}`);
                 if (isThrow) {
                     console.error(errObj);
                     throw errObj;
