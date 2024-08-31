@@ -22,19 +22,14 @@ window.addEventListener('urlChange-pip', async () => {
     if ((new RegExp('/courses/.*/chapters/.*/.*/.*')).test(location.href)) {
         await sleep(300);
         const ifr = await promiseLoop(() => {
-            const result = document.querySelector('[aria-label="教材モーダル"]>iframe');
-            return result;
+            return document.querySelector('iframe[title="教材"]');
         }, [null]);
         if(!ifr || ifr?.contentDocument?.baseURI === location.href) {
             console.info(`N-PiP: ifr要素が空または正常ではありませんでした。このログはPiPボタンをクリックしたときにも出ます。 ifr: ${ifr}`);
             return;
         };
 
-        await promiseLoop(async () => {
-            await appendBtn(async () => {
-                await pip(ifr);
-            }, ifr.contentDocument);
-        });
+        appendBtn(() => pip(ifr), await promiseLoop(() => getHeader(document)));
     }
 
     // フォーラム
@@ -69,13 +64,22 @@ window.addEventListener('urlChange-pip', async () => {
     }
 });
 
+/** ボタンの追加先であるヘッダーを取得する関数 */
+function getHeader(doc) {
+    const type = location.href.match(/exercise|movie|guide/)[0]
+    if (type !== 'movie') {
+        return doc.querySelector('h3+div')
+    }
+    const movieDoc = doc.querySelector('iframe[title="教材"]').contentDocument
+    return movieDoc.querySelector('h3+div')
+}
+
 /** 
  * ボタンを追加する関数 
  * @param {() => Promise<any>} handle 
- * @param {Document} doc   
+ * @param {HTMLElement} doc   
  */
-async function appendBtn(handle, doc, isAppend=true) {
-    const header = doc.querySelector('header');
+function appendBtn(handle, header, isAppend=true) {
     if(!header) {
         throw new Error(`header要素が${header}でした。読み込みが遅い可能性があります`);
     };
@@ -86,13 +90,7 @@ async function appendBtn(handle, doc, isAppend=true) {
     const isBookmark = !!header.querySelector('#bookmark-btn');
 
     const btn = strToElement('<button id="pip-btn" class="u-button type-primary"></button>');
-    btn.style.position = 'absolute';
-    btn.style.right = `${ isBookmark ? 270 : 130}px`;
-    btn.style.top = '0';
-    btn.style.marginTop = '-10px';
-    btn.style.padding = '0';
-    btn.style.lineHeight = '42px';
-    btn.style.width = '130px';
+    btn.className = header.querySelector('a').className
 
     btn.textContent = 'PiPで見る';
     btn.addEventListener('click', handle);
