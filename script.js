@@ -3,7 +3,7 @@
  * @param {HTMLIFrameElement} elem 
  */
 async function pip(elem) {
-    if(documentPictureInPicture.window) return;
+    if (documentPictureInPicture.window) return;
     const container = elem.parentElement; // 復帰用
     const pip = await documentPictureInPicture.requestWindow({
         width: 800,
@@ -22,26 +22,20 @@ window.addEventListener('urlChange-pip', async () => {
     if ((new RegExp('/courses/.*/chapters/.*/.*/.*')).test(location.href)) {
         await sleep(300);
         const ifr = await promiseLoop(() => {
-            const result = document.querySelector('[aria-label="教材モーダル"]>iframe');
-            return result;
+            return document.querySelector('iframe[title="教材"]');
         }, [null]);
-        if(!ifr || ifr?.contentDocument?.baseURI === location.href) {
+        if (!ifr || ifr?.contentDocument?.baseURI === location.href) {
             console.info(`N-PiP: ifr要素が空または正常ではありませんでした。このログはPiPボタンをクリックしたときにも出ます。 ifr: ${ifr}`);
             return;
         };
 
-        await promiseLoop(async () => {
-            await appendBtn(async () => {
-                await pip(ifr);
-            }, ifr.contentDocument);
-        });
+        appendBtn(() => pip(ifr), await promiseLoop(() => getHeader(document)));
     }
 
     // フォーラム
     if ((new RegExp('/questions/.*')).test(location.href)) {
-        await sleep(200);
-        const pList = await promiseLoop(() => document.querySelector('#root div:not([role="banner"] *)>p'));
-        if(!pList) return;
+        const pList = await promiseLoop(() => document.querySelector('#root div:not([role="banner"] *)>p'), [null]);
+        if (!pList) return;
         const aElem = pList.parentElement.querySelector('a');
 
         aElem.addEventListener('click', async () => {
@@ -51,53 +45,57 @@ window.addEventListener('urlChange-pip', async () => {
                 console.debug('N-PiP: 教材の要素が見つかりませんでした ifr:', ifr, ifr?.contentDocument);
                 return;
             }
-
             if (ifr.contentDocument.querySelector('#pip-btn')) {
                 console.debug('N-PiP: PiPボタンはすでにあります');
                 return;
             }
-            const btn = await promiseLoop(async () => await appendBtn(
-                async () => await pip(ifr),
-                ifr.contentDocument,
-            ));
-            if (!btn) {
-                console.info(`何らかの理由でボタンが追加できませんでした：btnが${btn}でした`);
-                return;
-            }
-            await promiseLoop(() => ifr.contentDocument.querySelector('header').append(btn));
+            await promiseLoop(() => appendBtn(() => pip(ifr), getHeader(document, '')));
         });
     }
 });
 
-/** 
- * ボタンを追加する関数 
- * @param {() => Promise<any>} handle 
- * @param {Document} doc   
- */
-async function appendBtn(handle, doc, isAppend=true) {
-    const header = doc.querySelector('header');
-    if(!header) {
-        throw new Error(`header要素が${header}でした。読み込みが遅い可能性があります`);
-    };
-    if(header.querySelector('#pip-btn')) {
-        console.debug('N-PiP: PiPボタンはすでにあります');
-        return;
-    };
-    const isBookmark = !!header.querySelector('#bookmark-btn');
+/** ボタンの追加先であるヘッダーを取得する関数 */
+function getHeader(doc, typeInput) {
+    const type = typeInput ?? location.href.match(/exercise|movie|guide/)[0]
+    if (type !== 'movie') {
+        return doc.querySelector('h3+div')
+    }
+    const movieDoc = doc.querySelector('iframe[title="教材"]').contentDocument
+    return movieDoc.querySelector('h3+div')
+}
 
-    const btn = strToElement('<button id="pip-btn" class="u-button type-primary"></button>');
-    btn.style.position = 'absolute';
-    btn.style.right = `${ isBookmark ? 270 : 130}px`;
-    btn.style.top = '0';
-    btn.style.marginTop = '-10px';
-    btn.style.padding = '0';
-    btn.style.lineHeight = '42px';
-    btn.style.width = '130px';
+/** ボタンを生成する関数 */
+function generateBtn(handle, header) {
+    const btn = document.createElement('button');
+    btn.id = "pip-btn";
+
+    const classes = header?.querySelector('a')?.className;
+    if (classes) {
+        btn.className = classes
+    }
 
     btn.textContent = 'PiPで見る';
     btn.addEventListener('click', handle);
-    if(isAppend) header.insertBefore(btn, header.querySelector('button'));
     return btn;
+}
+
+
+/** 
+ * ボタンを追加する関数 
+ * @param {() => Promise<any>} handle 
+ * @param {HTMLElement} doc   
+ */
+function appendBtn(handle, header) {
+    if (!header) {
+        throw new Error(`header要素が${header}でした。読み込みが遅い可能性があります`);
+    };
+    if (header.querySelector('#pip-btn')) {
+        console.debug('N-PiP: PiPボタンはすでにあります');
+        return;
+    };
+
+    const btn = generateBtn(handle, header);
+    header.insertBefore(btn, header.querySelector('button'));
 }
 
 { // urlChangeイベント
@@ -120,13 +118,13 @@ async function appendBtn(handle, doc, isAppend=true) {
     });
 }
 
-async function promiseLoop(func, ngList=[], isThrow=false) {
+async function promiseLoop(func, ngList = [], isThrow = false) {
     const TRIAL = 20;
     const SLEEP_MS = 50;
     for (let i = 0; i < TRIAL; i++) {
         try {
             const result = await func();
-            if(ngList.includes(result)) throw new Error(`関数の実行結果が${result}でした`);
+            if (ngList.includes(result)) throw new Error(`関数の実行結果が${result}でした`);
             return result;
         } catch (e) {
             await sleep(SLEEP_MS);
@@ -148,11 +146,4 @@ function sleep(sec) {
     return new Promise(resolve => {
         setTimeout(() => { resolve(); }, sec);
     })
-}
-
-/** 文字列をHTMLElementにする関数 @param {String} str @returns {HTMLElement} */
-function strToElement(str, inHTML = false) {
-    const tempEl = document.createElement(inHTML ? 'html' : 'body');
-    tempEl.innerHTML = str;
-    return inHTML ? tempEl : tempEl.firstElementChild;
 }
